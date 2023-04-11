@@ -85,49 +85,30 @@ class ProxyClient(fl.client.NumPyClient):
     def __init__(self, proxy_to):
         self.proxy_to = proxy_to
 
+    def _proxy(self, fn):
+        def proxied(*args, **kwargs):
+            args_pickled = pickle.dumps(args)
+            args_unpickled = pickle.loads(args_pickled)
+            kwargs_pickled = pickle.dumps(kwargs)
+            kwargs_unpickled = pickle.loads(kwargs_pickled)
+            return_value = fn(*args_unpickled, **kwargs_unpickled)
+            return_value_pickled = pickle.dumps(return_value)
+            return_value_unpickled = pickle.loads(return_value_pickled)
+            return return_value_unpickled
+        return proxied
+
     def get_parameters(self, config):
-        config_pickled = pickle.dumps(config)
-        config_unpickled = pickle.loads(config_pickled)
-
-        return_value = self.proxy_to().get_parameters(config_unpickled)
-
-        return_value_pickled = pickle.dumps(return_value)
-        return_value_unpickled = pickle.loads(return_value_pickled)
-        return return_value_unpickled
+        # Instantiate a new proxy_to class to test statelessness.
+        return self._proxy(self.proxy_to().get_parameters)(config)
 
     def set_parameters(self, parameters):
-        parameters_pickled = pickle.dumps(parameters)
-        parameters_unpickled = pickle.loads(parameters_pickled)
-
-        return_value = self.proxy_to().set_parameters(parameters_unpickled)
-
-        return_value_pickled = pickle.dumps(return_value)
-        return_value_unpickled = pickle.loads(return_value_pickled)
-        return return_value_unpickled
+        return self._proxy(self.proxy_to().set_parameters)(parameters)
 
     def fit(self, parameters, config):
-        config_pickled = pickle.dumps(config)
-        config_unpickled = pickle.loads(config_pickled)
-
-        parameters_pickled = pickle.dumps(parameters)
-        parameters_unpickled = pickle.loads(parameters_pickled)
-
-        return_value = self.proxy_to().fit(parameters_unpickled, config_unpickled)
-        return_value_pickled = pickle.dumps(return_value)
-        return_value_unpickled = pickle.loads(return_value_pickled)
-        return return_value_unpickled
+        return self._proxy(self.proxy_to().fit)(parameters, config)
 
     def evaluate(self, parameters, config):
-        config_pickled = pickle.dumps(config)
-        config_unpickled = pickle.loads(config_pickled)
-        parameters_pickled = pickle.dumps(parameters)
-        parameters_unpickled = pickle.loads(parameters_pickled)
-
-        return_value =  self.proxy_to().evaluate(parameters_unpickled, config_unpickled)
-
-        return_value_pickled = pickle.dumps(return_value)
-        return_value_unpickled = pickle.loads(return_value_pickled)
-        return return_value_unpickled
+        return self._proxy(self.proxy_to().evaluate)(parameters, config)
 
 
 # Define Flower client
