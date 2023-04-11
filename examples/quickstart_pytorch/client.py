@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 from torchvision.datasets import CIFAR10
 from torchvision.transforms import Compose, Normalize, ToTensor
 from tqdm import tqdm
+import pickle
 
 
 # #############################################################################
@@ -78,33 +79,89 @@ def load_data():
 # #############################################################################
 
 # Load model and data (simple CNN, CIFAR-10)
-net = Net().to(DEVICE)
-trainloader, testloader = load_data()
+
+
+class ProxyClient(fl.client.NumPyClient):
+    def __init__(self, proxy_to):
+        self.proxy_to = proxy_to
+
+    def get_parameters(self, config):
+        config_pickled = pickle.dumps(config)
+        config_unpickled = pickle.loads(config_pickled)
+
+        return_value = self.proxy_to().get_parameters(config_unpickled)
+
+        return_value_pickled = pickle.dumps(return_value)
+        return_value_unpickled = pickle.loads(return_value_pickled)
+        return return_value_unpickled
+
+    def set_parameters(self, parameters):
+        parameters_pickled = pickle.dumps(parameters)
+        parameters_unpickled = pickle.loads(parameters_pickled)
+
+        return_value = self.proxy_to().set_parameters(parameters_unpickled)
+
+        return_value_pickled = pickle.dumps(return_value)
+        return_value_unpickled = pickle.loads(return_value_pickled)
+        return return_value_unpickled
+
+    def fit(self, parameters, config):
+        config_pickled = pickle.dumps(config)
+        config_unpickled = pickle.loads(config_pickled)
+
+        parameters_pickled = pickle.dumps(parameters)
+        parameters_unpickled = pickle.loads(parameters_pickled)
+
+        return_value = self.proxy_to().fit(parameters_unpickled, config_unpickled)
+        return_value_pickled = pickle.dumps(return_value)
+        return_value_unpickled = pickle.loads(return_value_pickled)
+        return return_value_unpickled
+
+    def evaluate(self, parameters, config):
+        config_pickled = pickle.dumps(config)
+        config_unpickled = pickle.loads(config_pickled)
+        parameters_pickled = pickle.dumps(parameters)
+        parameters_unpickled = pickle.loads(parameters_pickled)
+
+        return_value =  self.proxy_to().evaluate(parameters_unpickled, config_unpickled)
+
+        return_value_pickled = pickle.dumps(return_value)
+        return_value_unpickled = pickle.loads(return_value_pickled)
+        return return_value_unpickled
 
 
 # Define Flower client
 class FlowerClient(fl.client.NumPyClient):
+    def __init__(self):
+        # Instantiate once per FlowerClient
+        self.net = Net().to(DEVICE)
+        self.trainloader, self.testloader = load_data()
+
     def get_parameters(self, config):
-        return [val.cpu().numpy() for _, val in net.state_dict().items()]
+        print("==== GET_PARAMETERS")
+        return [val.cpu().numpy() for _, val in self.net.state_dict().items()]
 
     def set_parameters(self, parameters):
-        params_dict = zip(net.state_dict().keys(), parameters)
+        print("==== SET_PARAMETERS")
+        params_dict = zip(self.net.state_dict().keys(), parameters)
         state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
-        net.load_state_dict(state_dict, strict=True)
+        self.net.load_state_dict(state_dict, strict=True)
 
     def fit(self, parameters, config):
+        print("==== FIT")
         self.set_parameters(parameters)
-        train(net, trainloader, epochs=1)
-        return self.get_parameters(config={}), len(trainloader.dataset), {}
+        train(self.net, self.trainloader, epochs=1)
+        return self.get_parameters(config={}), len(self.trainloader.dataset), {}
 
     def evaluate(self, parameters, config):
+        print("==== EVALUATE")
         self.set_parameters(parameters)
-        loss, accuracy = test(net, testloader)
-        return loss, len(testloader.dataset), {"accuracy": accuracy}
+        loss, accuracy = test(self.net, self.testloader)
+        return loss, len(self.testloader.dataset), {"accuracy": accuracy}
 
 
 # Start Flower client
 fl.client.start_numpy_client(
     server_address="127.0.0.1:8080",
-    client=FlowerClient(),
+    client=ProxyClient(FlowerClient),
 )
