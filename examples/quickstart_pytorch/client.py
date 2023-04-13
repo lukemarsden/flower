@@ -94,6 +94,10 @@ class ProxyClient(fl.client.NumPyClient):
             return_value = fn(*args_unpickled, **kwargs_unpickled)
             return_value_pickled = pickle.dumps(return_value)
             return_value_unpickled = pickle.loads(return_value_pickled)
+            print("fn", fn,
+                  "size of args", len(args_pickled),
+                  "size of kwargs", len(kwargs_pickled),
+                  "size of return_value", len(return_value_pickled))
             return return_value_unpickled
         return proxied
 
@@ -123,6 +127,11 @@ class FlowerClient(fl.client.NumPyClient):
         return [val.cpu().numpy() for _, val in self.net.state_dict().items()]
 
     def set_parameters(self, parameters):
+        # uh-oh, this looks darn stateful to me. But, the pattern is normally
+        # set_parameters immediately followed by a fit or evaluate, right? so we
+        # could just batch them up? store the state on the client and only pass
+        # it through when we call something that actually needs to access the
+        # data, right?
         print("==== SET_PARAMETERS")
         params_dict = zip(self.net.state_dict().keys(), parameters)
         state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
