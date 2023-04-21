@@ -84,6 +84,7 @@ def load_data():
 class ProxyClient(fl.client.NumPyClient):
     def __init__(self, proxy_to):
         self.proxy_to = proxy_to
+        self._parameters = None
 
     def _proxy(self, fn):
         def proxied(*args, **kwargs):
@@ -103,20 +104,29 @@ class ProxyClient(fl.client.NumPyClient):
 
     def get_parameters(self, config):
         print(">>> in proxy get_parameters")
-        # Instantiate a new proxy_to class to test statelessness.
-        return self._proxy(self.proxy_to().get_parameters)(config)
+        inst = self.proxy_to()
+        if self._parameters is not None:
+            self._proxy(inst.set_parameters)(self._parameters)
+        return self._proxy(inst.get_parameters)(config)
 
     def set_parameters(self, parameters):
         print(">>> in proxy set_parameters")
-        return self._proxy(self.proxy_to().set_parameters)(parameters)
+        self._parameters = parameters
+        # return self._proxy(self.proxy_to().set_parameters)(parameters)
 
     def fit(self, parameters, config):
         print(">>> in proxy fit")
-        return self._proxy(self.proxy_to().fit)(parameters, config)
+        inst = self.proxy_to()
+        if self._parameters is not None:
+            self._proxy(inst.set_parameters)(self._parameters)
+        return self._proxy(inst.fit)(parameters, config)
 
     def evaluate(self, parameters, config):
         print(">>> in proxy evaluate")
-        return self._proxy(self.proxy_to().evaluate)(parameters, config)
+        inst = self.proxy_to()
+        if self._parameters is not None:
+            self._proxy(inst.set_parameters)(self._parameters)
+        return self._proxy(inst.evaluate)(parameters, config)
 
 
 # Define Flower client
