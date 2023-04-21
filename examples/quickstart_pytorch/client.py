@@ -102,16 +102,20 @@ class ProxyClient(fl.client.NumPyClient):
         return proxied
 
     def get_parameters(self, config):
+        print(">>> in proxy get_parameters")
         # Instantiate a new proxy_to class to test statelessness.
         return self._proxy(self.proxy_to().get_parameters)(config)
 
     def set_parameters(self, parameters):
+        print(">>> in proxy set_parameters")
         return self._proxy(self.proxy_to().set_parameters)(parameters)
 
     def fit(self, parameters, config):
+        print(">>> in proxy fit")
         return self._proxy(self.proxy_to().fit)(parameters, config)
 
     def evaluate(self, parameters, config):
+        print(">>> in proxy evaluate")
         return self._proxy(self.proxy_to().evaluate)(parameters, config)
 
 
